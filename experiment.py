@@ -19,7 +19,7 @@ parser = argparse.ArgumentParser()
 
 parser.add_argument("--dataset")
 parser.add_argument("--dimension", default=1000, type=int)
-parser.add_argument("--epsilon", default=0.01, type=np.float)
+parser.add_argument("--epsilon", default=0.01, type=float)
 parser.add_argument("--kernel", default="linear")
 parser.add_argument("--repetitions", default=1, type=int)
 parser.add_argument("--outfile", default="results/out.csv")
@@ -92,7 +92,7 @@ for run in range(args.repetitions):
     scores = clf.decision_function(xtest)
     test_time = (time() - tic) * 1000 / xtest.shape[0]
     roc = roc_auc_score(ytest, scores)
-    df = df.append(
+    df = df._append(
         {
             "Run ID": run,
             "Dimension": args.dimension,
