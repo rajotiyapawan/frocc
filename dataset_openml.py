@@ -68,7 +68,7 @@ class Dataset:
 
     @classmethod
     def from_openml(cls, dataset_id: int) -> 'Dataset':
-        dataset = openml.datasets.get_dataset(dataset_id, download_data=True, download_qualities=True, download_features_meta_data=True)
+        dataset = openml.datasets.get_dataset(dataset_id, download_data=True, download_qualities=True)
         X, y, _, _ = dataset.get_data(
             dataset_format='dataframe',
             target=dataset.default_target_attribute
