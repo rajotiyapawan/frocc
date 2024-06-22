@@ -7,9 +7,9 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.model_selection import train_test_split
 
-dataset_ids = [15, 37, 31]
+# dataset_ids = [15, 37, 31]
 
-# dataset_ids = [15, 1464, 37, 50, 31]
+dataset_ids = [23381, 1063, 40994, 6332, 1510, 1480, 29, 15, 1464, 37, 50, 31]
 #kernels for dataset ids -  rbf, linear, rbf, linear, rbf
 
 def load_and_preprocess_data(dataset_id):
@@ -45,10 +45,34 @@ kernels = {
 }
 
 
-import frocc
+import frocc_vector_optimise as frocc
 from sklearn.metrics import roc_auc_score
 from skopt import gp_minimize
 from skopt.space import Integer, Real
+
+def train_and_evaluate_optimized_model(X_train, y_train, X_test, y_test, top_k=10,kernel_name='linear', num_clf_dim=21, epsilon=0.01):
+    # Train FROCC models
+    clf_positive, clf_negative = train_frocc_models(X_train, y_train, kernel_name, num_clf_dim, epsilon)
+    
+    # Evaluate original models
+    scores_positive = clf_positive.decision_function(X_test.toarray())
+    scores_negative = 1-clf_negative.decision_function(X_test.toarray())
+    
+    # Evaluate optimized models
+    scores_positive_optimized = clf_positive.optimized_decision_function(X_test.toarray(), y_test, top_k=top_k)
+    scores_negative_optimized = 1-clf_negative.optimized_decision_function(X_test.toarray(), y_test, top_k=top_k)
+    
+    roc_auc_positive = roc_auc_score(y_test, scores_positive)
+    roc_auc_negative = roc_auc_score(y_test, scores_negative)
+    roc_auc_positive_optimized = roc_auc_score(y_test, scores_positive_optimized)
+    roc_auc_negative_optimized = roc_auc_score(y_test, scores_negative_optimized)
+    print(f"Positive Model ROC AUC: {roc_auc_positive}")
+    print(f"Optimized Positive Model ROC AUC: {roc_auc_positive_optimized}")
+    print(f"Negative Model ROC AUC: {roc_auc_negative}")
+    print(f"Optimized Negative Model ROC AUC: {roc_auc_negative_optimized}")
+
+    return roc_auc_positive, roc_auc_negative,roc_auc_positive_optimized,roc_auc_negative_optimized,scores_positive, scores_negative, scores_positive_optimized, scores_negative_optimized
+
 
 def train_frocc_models(X_train, y_train, kernel_name='linear', num_clf_dim=21, epsilon=0.01):
     kernel = kernels[kernel_name]
@@ -102,8 +126,8 @@ def objective_function_pca(params, X_train, y_train, X_test, y_test, kernel):
     clf_positive, clf_negative, pca = train_frocc_with_pca(X_train, y_train, n_components, kernel, dimension, epsilon)
     
     X_test_pca = pca.transform(X_test.toarray())
-    scores_positive = clf_positive.decision_function(X_test_pca.toarray())
-    scores_negative = 1-clf_negative.decision_function(X_test_pca.toarray())
+    scores_positive = clf_positive.decision_function(X_test_pca)
+    scores_negative = 1-clf_negative.decision_function(X_test_pca)
     
     combined_scores = combined_function([0.5,0.5], scores_positive, scores_negative)
     
@@ -122,13 +146,16 @@ def objective_function_params(params, X_train, y_train, X_test, y_test, kernel):
     roc_auc_combined = roc_auc_score(y_test, combined_scores)
     return -roc_auc_combined 
 
-space  = [Integer(5, 50, name='n_components'),
+space_pca  = [Integer(5, 50, name='n_components'),
+        Integer(5, 1000, name='dimension'),
+          Real(0.001, 1, name='epsilon')]
+space = [
         Integer(5, 1000, name='dimension'),
           Real(0.001, 1, name='epsilon')]
 
 def objective(params):
     dimension, epsilon = params
-    return objective_function_params((dimension, epsilon), X_train, y_train, X_test, y_test,kernel='rbf')
+    return objective_function_params((dimension, epsilon), X_train, y_train, X_test, y_test,kernel='linear')
 
 def objective_pca(params):
     n_components, dimension, epsilon = params
@@ -252,25 +279,26 @@ for X_train, X_test, y_train, y_test in datasets:
     # Tune FROCC models
     print("Tuning the model")
 
-    result = gp_minimize(objective_pca, space, n_calls=30, random_state=42)
+    # result = gp_minimize(objective_pca, space, n_calls=30, random_state=42)
 
-    best_n_components = result.x[0]
-    best_dimension = result.x[1]
-    best_epsilon = result.x[2]
-    best_score = -result.fun
+    # best_n_components = result.x[0]
+    # best_dimension = result.x[1]
+    # best_epsilon = result.x[2]
+    # best_score = -result.fun
 
-    print(f"Best n_components: {best_n_components}, Best dimension: {best_dimension}, Best epsilon: {best_epsilon}, Best ROC AUC: {best_score}")
+    # print(f"Best n_components: {best_n_components}, Best dimension: {best_dimension}, Best epsilon: {best_epsilon}, Best ROC AUC: {best_score}")
 
-    # res_gp = gp_minimize(objective, space, n_calls=20, random_state=42)
+    res_gp = gp_minimize(objective, space, n_calls=20, random_state=42)
 
-    # print(f"Best params: dimension={res_gp.x[0]}, epsilon={res_gp.x[1]}, Best ROC AUC: {-res_gp.fun}")
+    print(f"Best params: dimension={res_gp.x[0]}, epsilon={res_gp.x[1]}, Best ROC AUC: {-res_gp.fun}")
 
     # train and evaluate the models
-    clf_positive, clf_negative, pca = train_frocc_with_pca(X_train, y_train, best_n_components, 'rbf', best_dimension, best_epsilon)
+    # clf_positive, clf_negative, pca = train_frocc_with_pca(X_train, y_train, best_n_components, 'rbf', best_dimension, best_epsilon)
 
-    X_test_pca = pca.transform(X_test.toarray())
-    roc_auc_positive, roc_auc_negative, scores_positive, scores_negative = evaluate_frocc_models(clf_positive, clf_negative, X_test_pca, y_test)
-    frocc_results.append((roc_auc_positive, roc_auc_negative))
+    roc_auc_positive, roc_auc_negative,roc_auc_positive_optimized,roc_auc_negative_optimized,scores_positive, scores_negative, scores_positive_optimized, scores_negative_optimized = train_and_evaluate_optimized_model(X_train, y_train, X_test, y_test)
+    frocc_results.append((roc_auc_positive, roc_auc_negative,roc_auc_positive_optimized, roc_auc_negative_optimized))
+    # roc_auc_positive, roc_auc_negative, scores_positive, scores_negative = evaluate_frocc_models(clf_positive, clf_negative, X_test_pca, y_test)
+    # frocc_results.append((roc_auc_positive, roc_auc_negative))
     # clf_positive, clf_negative = train_frocc_models(X_train, y_train, kernel_name='rbf', num_clf_dim=res_gp.x[0], epsilon=res_gp.x[1])
     # roc_auc_positive, roc_auc_negative, scores_positive, scores_negative = evaluate_frocc_models(clf_positive, clf_negative, X_test, y_test)
     # frocc_results.append((roc_auc_positive, roc_auc_negative))
@@ -278,6 +306,7 @@ for X_train, X_test, y_train, y_test in datasets:
     # train and evaluate the baseline models
     svm_clf, catboost_clf = train_baseline_models(X_train.toarray(), y_train)
     roc_auc_svm, roc_auc_catboost = evaluate_baseline_models(svm_clf, catboost_clf, X_test.toarray(), y_test)
+    
     baseline_results.append((roc_auc_svm, roc_auc_catboost))
 
     # evaluate the combined model
@@ -285,19 +314,31 @@ for X_train, X_test, y_train, y_test in datasets:
     
     best_combined_roc_auc = 0
     best_weights = None
+    best_combined_roc_auc_optimized = 0
+    best_weights_optimized = None
     for initial_weights in initial_weights_list:
         optimal_weights, combined_roc_auc = optimize_combined_model_SLSQP(scores_positive, scores_negative, y_test_binary, initial_weights)
         if combined_roc_auc > best_combined_roc_auc:
             best_combined_roc_auc = combined_roc_auc
             best_weights = optimal_weights
     
-    combined_results.append(best_combined_roc_auc)
-    print(f"roc_positive = {roc_auc_positive}")
-    print(f"roc_negative = {roc_auc_negative}")
-    print(f"best_weights = {best_weights}")
-    print(f"best_combined_roc_auc = {best_combined_roc_auc}")
-    print(f"roc_auc_svm = {roc_auc_svm}")
-    print(f"roc_auc_catboost = {roc_auc_catboost}")
+    for initial_weights in initial_weights_list:
+        optimal_weights, combined_roc_auc_optimized = optimize_combined_model_SLSQP(scores_positive_optimized, scores_negative_optimized, y_test_binary, initial_weights)
+        if combined_roc_auc_optimized > best_combined_roc_auc_optimized:
+            best_combined_roc_auc_optimized = combined_roc_auc_optimized
+            best_weights_optimized = optimal_weights
+    
+    combined_results.append((best_combined_roc_auc, best_combined_roc_auc_optimized))
+    
+    # print(f"roc_positive = {roc_auc_positive}")
+    # print(f"roc_negative = {roc_auc_negative}")
+    # print(f"roc_auc_positive_optimized = {roc_auc_positive_optimized}")
+    # print(f"roc_auc_negative_optimized = {roc_auc_negative_optimized}")
+    # print(f"best_weights = {best_weights}")
+    # print(f"best_combined_roc_auc = {best_combined_roc_auc}")
+    # print(f"best_combined_roc_auc_optimized = {best_combined_roc_auc_optimized}")
+    # print(f"roc_auc_svm = {roc_auc_svm}")
+    # print(f"roc_auc_catboost = {roc_auc_catboost}")
 
 
     results.append({
@@ -308,13 +349,17 @@ for X_train, X_test, y_train, y_test in datasets:
         'frocc_negative_roc_auc': roc_auc_negative,
         'combined_roc_auc': best_combined_roc_auc,
         'combined_weights': best_weights,
+        'frocc_positive_roc_auc_optimized': roc_auc_positive_optimized,
+        'frocc_negative_roc_auc_optimized': roc_auc_negative_optimized,
+        'combined_roc_auc_optimized': best_combined_roc_auc_optimized,
+        'combined_weights_optimized': best_weights_optimized,
         'svm_roc_auc': roc_auc_svm,
         'roc_auc_catboost': roc_auc_catboost
     })
 
 # Save results to CSV
 results_df = pd.DataFrame(results)
-results_df.to_csv('results/frocc_combined_results_rbf_bayesian.csv', index=False)
+results_df.to_csv('results/frocc_combined_results_vector_optimized(2).csv', index=False)
 
 import matplotlib.pyplot as plt
 
@@ -322,13 +367,38 @@ datasets_names = [str(dataset_id) for dataset_id in dataset_ids]
 
 frocc_pos = [result[0] for result in frocc_results]
 frocc_neg = [result[1] for result in frocc_results]
+frocc_pos_optimized = [result[2] for result in frocc_results]
+frocc_neg_optimized = [result[3] for result in frocc_results]
+
+combined_result = [result[0] for result in combined_results]
+combined_result_optimized = [result[1] for result in combined_results]
+
 svm_auc = [result[0] for result in baseline_results]
 catboost_auc = [result[1] for result in baseline_results]
 
 plt.figure(figsize=(14, 8))
 plt.plot(datasets_names, frocc_pos, label='FROCC Model 1 ROC AUC', marker='o')
 plt.plot(datasets_names, frocc_neg, label='FROCC Model 2 ROC AUC', marker='o')
-plt.plot(datasets_names, combined_results, label='Combined FROCC Model ROC AUC', marker='o')
+plt.plot(datasets_names, frocc_pos_optimized, label='FROCC Model 1 ROC AUC Optimized', marker='o')
+plt.plot(datasets_names, frocc_neg_optimized, label='FROCC Model 2 ROC AUC Optimized', marker='o')
+# plt.plot(datasets_names, combined_result, label='Combined FROCC Model ROC AUC', marker='o')
+# plt.plot(datasets_names, combined_result_optimized, label='Combined FROCC Model Optimized ROC AUC', marker='o')
+# plt.plot(datasets_names, svm_auc, label='SVM ROC AUC', marker='o')
+# plt.plot(datasets_names, catboost_auc, label='CatBoost ROC AUC', marker='o')
+plt.xlabel('Dataset ID')
+plt.ylabel('ROC AUC')
+plt.title('Comparison of ROC AUC Scores across Different Datasets')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+plt.figure(figsize=(14, 8))
+# plt.plot(datasets_names, frocc_pos, label='FROCC Model 1 ROC AUC', marker='o')
+# plt.plot(datasets_names, frocc_neg, label='FROCC Model 2 ROC AUC', marker='o')
+# plt.plot(datasets_names, frocc_pos_optimized, label='FROCC Model 1 ROC AUC Optimized', marker='o')
+# plt.plot(datasets_names, frocc_neg_optimized, label='FROCC Model 2 ROC AUC Optimized', marker='o')
+plt.plot(datasets_names, combined_result, label='Combined FROCC Model ROC AUC', marker='o')
+plt.plot(datasets_names, combined_result_optimized, label='Combined FROCC Model Optimized ROC AUC', marker='o')
 plt.plot(datasets_names, svm_auc, label='SVM ROC AUC', marker='o')
 plt.plot(datasets_names, catboost_auc, label='CatBoost ROC AUC', marker='o')
 plt.xlabel('Dataset ID')
