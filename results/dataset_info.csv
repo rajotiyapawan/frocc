@@ -1,0 +1,13 @@
+dataset id,n_classes,n_num_features,n_cat_features,dataset_name,training samples,label samples
+15,2,9,0,breast-w,699,699
+29,2,6,9,credit-approval,690,690
+31,2,7,13,credit-g,1000,1000
+37,2,8,0,diabetes,768,768
+50,2,0,9,tic-tac-toe,958,958
+1063,2,21,0,kc2,522,522
+1464,2,4,0,blood-transfusion-service-center,748,748
+1480,2,9,1,ilpd,583,583
+1510,2,30,0,wdbc,569,569
+6332,2,18,19,cylinder-bands,540,540
+23381,2,1,11,dresses-sales,500,500
+40994,2,18,0,climate-model-simulation-crashes,540,540

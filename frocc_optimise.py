@@ -407,3 +407,53 @@ plt.title('Comparison of ROC AUC Scores across Different Datasets')
 plt.legend()
 plt.grid(True)
 plt.show()
+
+
+# Set width of bar
+bar_width = 0.15
+
+# Set position of bar on X axis
+r1 = np.arange(len(dataset_ids))
+r2 = [x + bar_width for x in r1]
+r3 = [x + bar_width for x in r2]
+r4 = [x + bar_width for x in r3]
+r5 = [x + bar_width for x in r4]
+
+# Make the plot
+plt.figure(figsize=(14, 7))
+plt.bar(r1, frocc_pos, color='b', width=bar_width, edgecolor='grey', label='FROCC Model 1 ROC AUC')
+plt.bar(r2, frocc_neg, color='r', width=bar_width, edgecolor='grey', label='FROCC Model 2 ROC AUC')
+plt.bar(r3, frocc_pos_optimized, color='g', width=bar_width, edgecolor='grey', label='FROCC Model 1 ROC AUC Optimized')
+plt.bar(r4, frocc_neg_optimized, color='c', width=bar_width, edgecolor='grey', label='FROCC Model 2 ROC AUC Optimized')
+# plt.bar(r5, catboost_auc, color='m', width=bar_width, edgecolor='grey', label='CatBoost ROC AUC')
+
+# Add labels
+plt.xlabel('Dataset IDs', fontweight='bold')
+plt.ylabel('ROC AUC', fontweight='bold')
+plt.xticks([r + 2 * bar_width for r in range(len(dataset_ids))], dataset_ids, rotation=45)
+
+# Add legend
+plt.legend()
+
+# Display the plot
+plt.title('ROC AUC Scores Comparison Across Models')
+plt.show()
+
+# Make the plot
+plt.figure(figsize=(14, 7))
+plt.bar(r1, combined_result, color='b', width=bar_width, edgecolor='grey', label='Combined FROCC Model ROC AUC')
+plt.bar(r2, combined_result_optimized, color='g', width=bar_width, edgecolor='grey', label='Combined FROCC Model Optimized ROC AUC')
+plt.bar(r3, svm_auc, color='c', width=bar_width, edgecolor='grey', label='SVM ROC AUC')
+plt.bar(r4, catboost_auc, color='m', width=bar_width, edgecolor='grey', label='CatBoost ROC AUC')
+
+# Add labels
+plt.xlabel('Dataset IDs', fontweight='bold')
+plt.ylabel('ROC AUC', fontweight='bold')
+plt.xticks([r + 2 * bar_width for r in range(len(dataset_ids))], dataset_ids, rotation=45)
+
+# Add legend
+plt.legend()
+
+# Display the plot
+plt.title('ROC AUC Scores Comparison Across Models')
+plt.show()

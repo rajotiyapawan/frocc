@@ -1,0 +1,107 @@
+\section{LCM: A Surprisingly Effective Framework for Supervised Cross-modal Retrieval} \label{sec:lcm}
+
+In this work, we address the problem of \emph{supervised cross-modal retrieval} and explore whether it is possible to achieve high-quality retrieval \emph{without} resorting to very costly models. We introduce a \emph{Lightweight framework for Cross-Modal retrieval (LCM)} method that learns a lightweight non-linear transformation of embeddings into a shared space by optimizing the distance between embeddings with similar semantic relations. LCM utilizes an autoencoder to project semantic class labels into the common space and shallow feed-forward networks for each modality to transform input embeddings to a common representation space. It uses a two-stage retrieval method, inspired by the pseudo-relevance feedback techniques, called \textit{2-stage k-nearest neighbor (2Sknn) search}. In the first retrieval stage, 2Sknn efficiently retrieves an initial set of candidate results from this common space using scalable nearest-neighbor indexes. The second stage uses the class label statistics on the candidates retrieved in the first stage to refine the retrieval and prioritize semantically relevant objects.
+
+\subsection{Related Work}
+Numerous techniques for cross-modal retrieval have been proposed, ranging from deep learning-based models to those which learn hash representations for efficient indexing of cross-modal data~\cite{clip4cmr,pan,sdml,acmr,dscmr,dsmhn,dvsh,svhn,prdh,ssah,mmach}. Other approaches include the use of adversarial networks for learning modality invariant transformation of multi-modal data~\cite{acmr, daml, ssah}, learning of visual-semantic fine-grained features (e.g., word-level feature learning) using attention/ transformers/RNN networks \cite{Lee2018StackedCA, Chen2020IMRAMIM, Qu2021DynamicMI, Cao2021GlobalRA}, and more. 
+Invariably, most of these methods employ a large number of trainable parameters, with correspondingly high demands on computational resources, memory, training time, and, in some cases, inference time.
+Typically, the supervised cross-modal retrieval methods use label information to classify the learned common representation into respective classes \cite{dch, daml, sdml, acmr, dscmr}. Only a few methods exploit the class information in a sophisticated way \cite{svhn, ssah}.
+%% What are the weaknesses of such methods
+They use an explicit label network to learn more discriminative label representations in the common space that guides the modality-specific common representations to preserve inter- and intra-modal similarity. Nearest neighbors are retrieved using \textit{cosine}, \textit{euclidean}, \textit{Hamming} distances, or, in some cases, a custom nearest neighbor measure in the common space \cite{jgrhml, JRL, cdpae}.
+
+\subsection{Proposed Framework}
+\begin{figure*}[h]
+    \centering
+    \includegraphics[width=\textwidth]{Figures/lcm.png}
+    \caption{Framework for LCM. Using feed-forward neural networks F and G, we project images and text onto a shared space. Additionally, we project labels into shared space and attempt to minimize the distance between similar items within and across modalities. At inference time, we project the query into a common space, locate nearest neighbors in the same modality, rank labels according to their frequency, and lastly sort cross-modal items for recommendation.}
+    \label{fig:deepsrlch_framework}
+\end{figure*}
+%------------------------------------------------------------------------------------
+% Figure~\ref{fig:deepsrlch_framework} shows the overall LCM framework.
+% Introducing the image
+The LCM framework consists of two parts: model training and retrieval. The model training first extracts features from the raw data. Then modality-specific light-weight neural networks (3 layers each) learn the compressed representation for the corresponding input items. Finally, we utilize \emph{pivots}, represented as $B$, which guide the dense representations to preserve inter- and intra-modal similarity in the common representation space. Once the model is trained, the retrieval happens in two stages. Given a query in one modality, the first stage retrieves items from the same modality, and the second stage retrieves items from another modality. The following sections elaborate more on the model training, the use of pivots, and retrieval stages.
+    
+\noindent\textbf{Common Representation Space Learning:}
+LCM adopts the common representation learning objective of SRLCH~\cite{srlch} and improves over it significantly as follows: (a) we use lightweight modality-specific neural networks to transform the input features into the common space; (b) instead of using kernels to enforce non-linearity in transforming the class labels, we employ an auto-encoder network that can easily be used in both uni- and multi-label settings; and (c) we abandon the hashing-based retrieval and instead use highly scalable nearest neighbor indexing techniques (e.g., ScaNN~\cite{avq_2020} or FAISS without any loss in speed and better performance. The detailed model training pipeline is illustrated in the portion marked ``Training'' of Figure~\ref{fig:deepsrlch_framework} 
+% \footnote{\url{https://faiss.ai}})
+
+\noindent\textbf{2-stage k-nearest neighbor (2Sknn) search Algorithm:} \label{lbl:fault_tolerant_nn_search}
+% High-level idea
+We propose a simple yet effective search technique for cross-modal retrieval called the 2-stage k-nearest neighbor (2Sknn) search. It is a two-stage retrieval process.
+In the initial stage, items from the same modality as the query are retrieved. Using the label statistics of the items retrieved in the first stage, the second stage retrieves items from a different modality.
+The detailed 2Sknn pipeline is illustrated in the portion marked ``Retrieval'' of Figure~\ref{fig:deepsrlch_framework}. More details about the model training and 2Sknn retrieval are mentioned in our paper \cite{dwijesh} and will be included in the thesis.
+
+\subsection{Experimental setup}
+\noindent\textbf{Datasets and Features:}
+To verify the efficacy of our proposed approach, we conducted experiments on six benchmark datasets, namely Wikipedia \cite{wiki}, Pascal-Sentence \cite{pascal}, NUS-WIDE-10K \cite{nuswide}, XmediaNet \cite{Peng2018AnOO, xmedianet}, MS-COCO \cite{mscoco} (2017 version), and MIRFlickr \cite{mirflickr25k}. The dataset is divided into training, validation, retrieval, and query sets. The retrieval set contains data from a different modality than the query set. We presume that the retrieval set contains labels, and the items do not need to be aligned to the query set. 
+% The statistical summary of the six datasets is summarised in Table \ref{tab:dataset}.  \footnote{https://github.com/openai/CLIP}
+\par For the comparison with state-of-the-art baseline methods (Table-\ref{tab:sota_big} and \ref{tab:sota_coco}), we represent our images and texts using CLIP features. We follow the dataset partition and feature exaction strategies from CLIP4CMR \cite{clip4cmr} and take the mAP values for baseline methods on uni-label datasets from the CLIP4CMR \cite{clip4cmr} paper. Similarly, we follow the ALGCN \cite{algcn} dataset partitioning scheme and take the mAP values for baseline methods on the multi-label dataset from the ALGCN \cite{algcn} paper. For small datasets like Pascal Sentences and Wikipedia, end-to-end training cannot produce adequate unimodal representations. Thus for consistency in the work, we are using pre-trained image and text features from CLIP for initializing all the datasets, and we see end-to-end training as the future for training large datasets.
+
+\noindent\textbf{Evaluation Metrics:}
+In this work, we consider image-to-text and text-to-image retrieval tasks. We use mAP to evaluate our method on various datasets. mAP value is the mean of all queries' average precision (AP). mAP is calculated over all retrieved results similar to \cite{dscmr, pan, clip4cmr}. All presented mAP values for our method are averaged over three runs. For all the datasets, two items are considered relevant if they share at least one label.
+
+\subsection{Experimental Results}
+To demonstrate the efficacy of our proposed method, we compare our LCM with the results reported by several state-of-the-art methods. A few of the baseline methods are unsupervised, while the majority of the baseline methods are supervised. For a fair comparison with the unsupervised methods, we consider an unsupervised variant of our method called LCM$^\triangle$. Further, we also present our comparison for uni-label datasets and for multi-label datasets separately as not all baselines were evaluated on both uni- and multi-label datasets. 
+
+\begin{table*}
+\centering
+\caption{{Performance comparison in terms of mAP scores on four widely used uni-label datasets for cross-modal retrieval. $\triangle$ denotes unsupervised methods. 
+The bottom half of the table contains supervised methods.}}
+  \label{tab:sota_big}
+\setlength{\tabcolsep}{5pt}
+  \begin{tabular}{c|ccc|ccc|ccc|ccc}
+    \toprule
+     Method & \multicolumn{3}{c|}{Wikipedia} & \multicolumn{3}{c|}{Pascal Sentence} & \multicolumn{3}{c|}{NUS-WIDE-10K} &\multicolumn{3}{c}{XmediaNet}\\
+     & I2T & T2I & Avg & I2T & T2I & Avg & I2T & T2I & Avg & I2T & T2I & Avg\\
+     \midrule
+     CCA$^\triangle$ \cite{cca} & 0.30 & 0.27 & 0.29 & 0.20 & 0.20 & 0.20 & 0.17 & 0.18 & 0.18 & 0.21 & 0.21 & 0.21 \\
+     KCCA$^\triangle$ \cite{KCCA} & 0.43 & 0.39 & 0.41 & 0.49 & 0.45 & 0.47 & 0.35 & 0.36 & 0.36 & 0.25 & 0.27 & 0.26\\
+     Corr-AE$^\triangle$ \cite{corr-ae} & 0.44 & 0.42 & 0.43 & 0.53 & 0.52 & 0.53 & 0.44 & 0.49 & 0.47 & 0.47 & 0.50 & 0.49 \\
+     %\midrule
+     \textbf{LCM$^\triangle$} & \textbf{0.62} & \textbf{0.70} & \textbf{0.66} & \textbf{0.64} & \textbf{0.66} & \textbf{0.65} & \textbf{0.73} & \textbf{0.66} & \textbf{0.70} & \textbf{0.68} & \textbf{0.58} & \textbf{0.63}\\
+     \bottomrule
+     
+     DSCMR \cite{dscmr} & 0.52 & 0.49 & 0.51 & 0.67 & 0.67 & 0.67 & 0.56 & 0.59 & 0.58 & 0.64 & 0.65 & 0.65 \\
+     PAN \cite{pan} & 0.52 & 0.46 & 0.49 & 0.69 & 0.69 & 0.69 & 0.59 & 0.57 & 0.58 & 0.67 & 0.66 & 0.67 \\
+     CLIP4CMR \cite{clip4cmr} & 0.60 & 0.59 & 0.60 & 0.67 & 0.66 & 0.67 & 0.60 & 0.63 & 0.62 & 0.68 & 0.71 & 0.70 \\
+     \textbf{LCM} & \textbf{0.65} & \textbf{0.84} & \textbf{0.75} & \textbf{0.74} & \textbf{0.78} & \textbf{0.76} & \textbf{0.81} & \textbf{0.71} & \textbf{0.76} & \textbf{0.84} & \textbf{0.75} & \textbf{0.80}\\
+  \bottomrule
+\end{tabular}
+\end{table*}
+%---------------------------------------------
+
+\par Table~\ref{tab:sota_big} and Table~\ref{tab:sota_coco} show the comparison of mAP values on image-to-text and text-to-image retrieval tasks on four uni-label datasets and two multi-label datasets for cross-modal retrieval respectively. In both, the first half of the table contains unsupervised models, and the bottom half contains the supervised retrieval models. 
+We can observe that LCM significantly outperforms all the baseline methods and is effective for both uni-label and multi-label datasets. Specifically, LCM outperforms the second-best baseline method with an improvement of 0.15, 0.07, 0.14, 0.1, 0.09, and 0.07 in terms of average mAP score on Wikipedia, Pascal Sentence, NUS-WIDE-10K, XMediaNet, MS-COCO, and MIRFlickr datasets, respectively.
+\par We observe that there is a significant difference between the mAP values of I2T and T2I in Table-\ref{tab:sota_big} and \ref{tab:sota_coco} for our method. The reason is that the mAP values of LCM depend upon the first stage of our 2Sknn algorithm. The mean reciprocal rank (MRR) of the true class label in the ranked labels in stage-1 of the 2Sknn algorithm is as follows: 0.71/0.87 for query images/texts from Wikipedia, 0.77/0.78 for Pascal Sentence, 0.85/0.75 for NUS-WIDE-10K, and 0.86/0.77 for XmediaNet. Consequently, the difference in Mean Reciprocal Rank (MRR) between image and text queries leads to a variation in the Mean Average Precision (mAP) values for the Image-to-Text (I2T) and Text-to-Image (T2I) tasks. 
+
+\begin{table*}
+\centering
+  \caption{\textbf{Performance comparison in terms of mAP on multi-label MS-COCO dataset. $\triangle$ denotes unsupervised methods. The bottom half of the table contains supervised methods.}}
+  \label{tab:sota_coco}
+  \setlength{\tabcolsep}{12pt}
+  \begin{tabular}{c|ccc|ccc}
+    \toprule
+     Method & \multicolumn{3}{c}{MS-COCO} &\multicolumn{3}{c}{MIRFlickr}\\
+     & I2T & T2I & Avg & I2T & T2I & Avg\\
+     \midrule
+    CCA$^\triangle$  \cite{cca}&  0.65 &  0.66 &  0.66 & 0.71 & 0.72 & 0.72 \\
+    Corr-AE$^\triangle$  \cite{corr-ae}&  0.65 &  0.67 &  0.66 & 0.71 & 0.73 & 0.72\\
+    DCCA$^\triangle$  \cite{dcca} &  0.64 &  0.63 &  0.64 & 0.74 & 0.75 & 0.75\\
+    %\midrule
+    \textbf{LCM$^\triangle$} & \textbf{0.87} & \textbf{0.86} & \textbf{0.87} & \textbf{0.74} & 0.74 & 0.74\\
+    \bottomrule
+    % ACMR \cite{acmr} &  0.71 &  0.71 &  0.71 & 0.74 & 0.75 & 0.75\\
+    % DCDH \cite{Wang2021DeepCD} &  0.61 &  0.60 &  0.61 & 0.74 & 0.76 & 0.75\\
+    DSCMR \cite{dscmr} &  0.81 &  0.81 &  0.81 & 0.75 & 0.80 & 0.78\\
+    ALGCN \cite{algcn} &  0.84 &  0.83 &  0.84 & 0.80 & 0.82 & 0.81\\
+    CLIP4CMR \cite{clip4cmr} & 0.77 & 0.78 & 0.78 & 0.72 & 0.74 & 0.73\\
+    \textbf{LCM} & \textbf{0.92} & \textbf{0.93} & \textbf{0.93} & \textbf{0.94} & \textbf{0.82} & \textbf{0.88}\\
+  \bottomrule
+\end{tabular}
+\end{table*}
+%---------------------------------------------
+
+\subsection{Conclusion}
+In this work, we proposed a lightweight framework called LCM to first learn a discriminative common representation space for uni-label and multi-label datasets using an autoencoder network for label projections. Subsequently, a 2-stage k-nearest neighbor (2Sknn) search is used to get more than 9-23\% improvements in retrieval performance over state-of-the-art baselines across diverse multimodal benchmark datasets.
+
+% We note that the 2Sknn method can be used independently with any supervised common space learning method to achieve more than 10-20\% improvements in their mAP scores.
